@@ -9,10 +9,10 @@ import org.firstinspires.ftc.teamcode.opmodes.BaseTeleOp.Alliance;
 @Config
 public class LEDIndicator {
     public static double COLOR_OFF = 0.00;
-    public static double COLOR_RED = 0.29;      // Red Alliance
-    public static double COLOR_GREEN = 0.52;    // Shooting
+    public static double COLOR_RED = 0.2799;      // Red Alliance
+    public static double COLOR_GREEN = 0.5;    // Shooting
     public static double COLOR_BLUE = 0.62;     // Blue Alliance
-    public static double COLOR_PURPLE = 0.70;   // Confirmed Full
+    public static double COLOR_PURPLE = 0.72;   // Confirmed Full
 
     // 0.5s ON, 0.5s OFF (Clean 1 Hz blink)
     public static double BLINK_INTERVAL_SEC = 0.50;
