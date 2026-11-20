@@ -15,7 +15,7 @@ import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.LEDIndicator;
 import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ShotSolver;
-import org.firstinspires.ftc.teamcode.subsystems.TurretConfig;
+import org.firstinspires.ftc.teamcode.configurables.TurretConfig;
 import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
 
 import java.util.ArrayList;

@@ -6,6 +6,8 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
+import org.firstinspires.ftc.teamcode.configurables.TurretConfig;
+
 public class TurretSubsystem {
 
     private final CRServo turretLeft;
@@ -18,6 +20,11 @@ public class TurretSubsystem {
     private double currentPower = 0.0;
 
     private boolean latchedToLeft = false;
+
+    // Shoot-on-the-move state
+    private boolean sotmEnabled = TurretConfig.SOTM_ENABLED_AT_START;
+    private double sotmLeadSec = 0.0;
+    private double sotmShiftIn = 0.0;
 
     private double integralSum = 0.0;
     private double lastError = 0.0;
@@ -35,10 +42,6 @@ public class TurretSubsystem {
 
     public void setTargetAngle(double degrees) {
         this.targetAngleDeg = Range.clip(degrees, TurretConfig.MIN_ANGLE_DEG, TurretConfig.MAX_ANGLE_DEG);
-    }
-
-    public void trimTarget(double deltaDegrees) {
-        setTargetAngle(this.targetAngleDeg + deltaDegrees);
     }
 
     public double getTargetAngle() {
@@ -60,6 +63,78 @@ public class TurretSubsystem {
     public boolean isAtTarget() {
         return Math.abs(targetAngleDeg - currentAngleDeg) <= TurretConfig.TOLERANCE_DEG;
     }
+
+    // ==========================================
+    // GOAL AIMING (with optional shoot-on-the-move)
+    // ==========================================
+
+    /**
+     * Aims at a stationary goal (no motion compensation).
+     * Turret sign convention: Right = Positive (+), Left = Negative (-).
+     */
+    public void aimAt(double robotX, double robotY, double robotHeadingDeg,
+                      double goalX, double goalY, double trimDeg) {
+        aimAt(robotX, robotY, robotHeadingDeg, 0.0, 0.0, goalX, goalY, trimDeg);
+    }
+
+    /**
+     * Aims at the goal. If shoot-on-the-move is enabled, aims at a "virtual goal" shifted
+     * BACKWARD by (robot velocity x lead time), since the ball keeps the robot's velocity.
+     * Only the turret is compensated: this fixes sideways motion, not motion toward/away
+     * from the goal (that would need RPM compensation).
+     *
+     * @param velX, velY robot FIELD-frame velocity in inches/sec (e.g. follower.velocity())
+     * @param trimDeg    driver trim added after the aim calculation
+     */
+    public void aimAt(double robotX, double robotY, double robotHeadingDeg,
+                      double velX, double velY,
+                      double goalX, double goalY, double trimDeg) {
+        double aimX = goalX;
+        double aimY = goalY;
+        sotmLeadSec = 0.0;
+        sotmShiftIn = 0.0;
+
+        if (sotmEnabled) {
+            double distance = Math.hypot(goalX - robotX, goalY - robotY);
+            sotmLeadSec = timeOfFlight(distance) + TurretConfig.SOTM_LAUNCH_DELAY_SEC;
+            double speed = Math.hypot(velX, velY);
+
+            if (speed >= TurretConfig.SOTM_MIN_SPEED_IN_PER_SEC && sotmLeadSec > 0.0) {
+                double shiftX = velX * sotmLeadSec;
+                double shiftY = velY * sotmLeadSec;
+                double shift = Math.hypot(shiftX, shiftY);
+                if (shift > TurretConfig.SOTM_MAX_LEAD_IN) {
+                    double scale = TurretConfig.SOTM_MAX_LEAD_IN / shift;
+                    shiftX *= scale;
+                    shiftY *= scale;
+                    shift = TurretConfig.SOTM_MAX_LEAD_IN;
+                }
+                aimX = goalX - shiftX;
+                aimY = goalY - shiftY;
+                sotmShiftIn = shift;
+            }
+        }
+
+        double fieldAngleToGoal = Math.toDegrees(Math.atan2(aimY - robotY, aimX - robotX));
+        double relativeAngle = wrap180(fieldAngleToGoal - robotHeadingDeg);
+        setTargetAngle(-relativeAngle + trimDeg);
+    }
+
+    public static double timeOfFlight(double distanceInches) {
+        return TurretConfig.SOTM_TOF_OFFSET_SEC + TurretConfig.SOTM_TOF_SEC_PER_INCH * distanceInches;
+    }
+
+    private static double wrap180(double degrees) {
+        while (degrees > 180.0) degrees -= 360.0;
+        while (degrees < -180.0) degrees += 360.0;
+        return degrees;
+    }
+
+    public void setSotmEnabled(boolean enabled) { sotmEnabled = enabled; }
+    public void toggleSotm() { sotmEnabled = !sotmEnabled; }
+    public boolean isSotmEnabled() { return sotmEnabled; }
+    public double getSotmLeadSec() { return sotmLeadSec; }
+    public double getSotmShiftIn() { return sotmShiftIn; }
 
     public void stop() {
         turretLeft.setPower(0);

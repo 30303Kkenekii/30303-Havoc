@@ -6,11 +6,11 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 @Config
 public class ShotSolver {
     // --- Dashboard Tunables ---
-    public static double SHOOT_FEED_TIME = 0.60;   // Feed duration into flywheel
-    public static double SHOOT_LOWER_DELAY = 0.20; // Delay before lowering intake pivot
-    public static double RECOVERY_DELAY_SEC = 0.60; // Delay before lowering & resuming on recovery
+    public static double SHOOT_FEED_TIME = 0.60;     // Feed duration into flywheel
+    public static double GATE_CLOSE_DELAY_SEC = 0.20; // Wait for the gate to close before intaking again
+    public static double RECOVERY_DELAY_SEC = 0.60;  // Delay before resuming intake on recovery
 
-    public enum State { IDLE, FEEDING, WAITING_TO_LOWER, RECOVERING }
+    public enum State { IDLE, FEEDING, CLOSING_GATE, RECOVERING }
     private State state = State.IDLE;
     private final ElapsedTime timer = new ElapsedTime();
 
@@ -38,7 +38,7 @@ public class ShotSolver {
      * Triggers the false-positive reset (Button A).
      */
     public void startRecovery() {
-        if (state != State.FEEDING && state != State.WAITING_TO_LOWER) {
+        if (state != State.FEEDING && state != State.CLOSING_GATE) {
             shooter.closeGate();
             state = State.RECOVERING;
             timer.reset();
@@ -46,7 +46,7 @@ public class ShotSolver {
     }
 
     public boolean isShooting() {
-        return state == State.FEEDING || state == State.WAITING_TO_LOWER;
+        return state == State.FEEDING || state == State.CLOSING_GATE;
     }
 
     public boolean isBusy() {
@@ -67,27 +67,21 @@ public class ShotSolver {
                 if (timer.seconds() >= SHOOT_FEED_TIME) {
                     intake.stop();
                     shooter.closeGate();
-                    state = State.WAITING_TO_LOWER;
+                    state = State.CLOSING_GATE;
                     timer.reset();
                 }
                 break;
 
-            case WAITING_TO_LOWER:
+            case CLOSING_GATE:
                 intake.stop();
-                if (timer.seconds() >= SHOOT_LOWER_DELAY) {
-                    intake.pivotDown();
-                    intake.intake();
-                    intake.resetAutoSequence();
-                    state = State.IDLE;
+                if (timer.seconds() >= GATE_CLOSE_DELAY_SEC) {
+                    resumeIntaking();
                 }
                 break;
 
             case RECOVERING:
                 if (timer.seconds() >= RECOVERY_DELAY_SEC) {
-                    intake.pivotDown();
-                    intake.intake();
-                    intake.resetAutoSequence();
-                    state = State.IDLE;
+                    resumeIntaking();
                 }
                 break;
 
@@ -95,5 +89,11 @@ public class ShotSolver {
             default:
                 break;
         }
+    }
+
+    private void resumeIntaking() {
+        intake.intake();
+        intake.resetAutoSequence();
+        state = State.IDLE;
     }
 }

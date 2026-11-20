@@ -7,7 +7,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.CRServo;
-import org.firstinspires.ftc.teamcode.subsystems.TurretConfig;
+import org.firstinspires.ftc.teamcode.configurables.TurretConfig;
 
 @Config
 @TeleOp(name = "Turret Dual Zero Finder", group = "Tuners")

@@ -1,46 +1,23 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
-import com.acmerobotics.dashboard.config.Config;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.Range;
+import org.firstinspires.ftc.teamcode.configurables.ShooterConfig;
 
-@Config
 public class ShooterSubsystem {
-    public static int TRIM_STEP = 10;
-
-    // --- Hard Safety Clamps ---
-    public static double MIN_TPS = 2070.0;
-    public static double MAX_TPS = 2510.0;
-
-    // --- 4th-Degree Polynomial Coefficients ---
-    // y = -0.00065959x^4 + 0.168091x^3 - 15.5185x^2 + 622.75902x - 7111.16613
-    public static double COEFF_A = -0.00065959;
-    public static double COEFF_B = 0.168091;
-    public static double COEFF_C = -15.5185;
-    public static double COEFF_D = 622.75902;
-    public static double COEFF_E = -7111.16613;
-
-    // --- Tuned Velocity PIDF Coefficients ---
-    public static double P = 25.0;
-    public static double I = 0.0;
-    public static double D = 0.0;
-    public static double F = 12.5;
-
-    public static double GATE_CLOSED = 0.50;
-    public static double GATE_OPEN = 0.65;
-
     private final DcMotorEx shooter;
     private final Servo transferGate;
 
-    private double targetVelocity = 2220.0;
+    private double targetVelocity = ShooterConfig.DEFAULT_TARGET_TPS;
     private boolean flywheelEnabled = false;
     private boolean gateOpen = false;
 
     private double lastP, lastI, lastD, lastF;
 
+    /** Closes the transfer gate (this is the shooter's "init state"). The flywheel stays off until spinUp(). */
     public ShooterSubsystem(HardwareMap hwMap) {
         shooter = hwMap.get(DcMotorEx.class, "shooter");
         transferGate = hwMap.get(Servo.class, "transferGate");
@@ -54,44 +31,44 @@ public class ShooterSubsystem {
     }
 
     /**
-     * Calculates base flywheel velocity from distance using the 4th-degree polynomial.
-     * Output is strictly clamped between MIN_TPS (2070) and MAX_TPS (2510).
+     * Calculates base flywheel velocity from distance using the 4th-degree polynomial,
+     * clamped between MIN_TPS and MAX_TPS.
      */
     public static double calculateVelocityFromDistance(double distanceInches) {
         double x = distanceInches;
-        // Horner's form: highly efficient & numerically stable
-        double rawTps = ((((COEFF_A * x + COEFF_B) * x + COEFF_C) * x + COEFF_D) * x) + COEFF_E;
-        return Range.clip(rawTps, MIN_TPS, MAX_TPS);
+        // Horner's form: efficient & numerically stable
+        double rawTps = ((((ShooterConfig.COEFF_A * x + ShooterConfig.COEFF_B) * x + ShooterConfig.COEFF_C) * x
+                + ShooterConfig.COEFF_D) * x) + ShooterConfig.COEFF_E;
+        return Range.clip(rawTps, ShooterConfig.MIN_TPS, ShooterConfig.MAX_TPS);
     }
 
     public void applyPidCoefficients() {
-        shooter.setVelocityPIDFCoefficients(P, I, D, F);
-        lastP = P;
-        lastI = I;
-        lastD = D;
-        lastF = F;
+        shooter.setVelocityPIDFCoefficients(ShooterConfig.P, ShooterConfig.I, ShooterConfig.D, ShooterConfig.F);
+        lastP = ShooterConfig.P;
+        lastI = ShooterConfig.I;
+        lastD = ShooterConfig.D;
+        lastF = ShooterConfig.F;
     }
 
     public void spinUp() { flywheelEnabled = true; }
     public void spinDown() { flywheelEnabled = false; }
     public boolean isFlywheelOn() { return flywheelEnabled; }
 
-    // In ShooterSubsystem.java:
+    /** Sets the target (trims allowed to go outside MIN/MAX_TPS, but never outside the ABS clamps). */
     public void setTargetVelocity(double tps) {
-        // Allows trims to drop below 2070 or above 2510 without being blocked!
-        this.targetVelocity = Range.clip(tps, 1800.0, 2750.0);
+        this.targetVelocity = Range.clip(tps, ShooterConfig.ABS_MIN_TPS, ShooterConfig.ABS_MAX_TPS);
     }
 
     public double getTargetVelocity() { return targetVelocity; }
     public double getCurrentVelocity() { return shooter.getVelocity(); }
 
     public void openGate() {
-        transferGate.setPosition(GATE_OPEN);
+        transferGate.setPosition(ShooterConfig.GATE_OPEN);
         gateOpen = true;
     }
 
     public void closeGate() {
-        transferGate.setPosition(GATE_CLOSED);
+        transferGate.setPosition(ShooterConfig.GATE_CLOSED);
         gateOpen = false;
     }
 
@@ -100,7 +77,8 @@ public class ShooterSubsystem {
     }
 
     public void update() {
-        if (P != lastP || I != lastI || D != lastD || F != lastF) {
+        if (ShooterConfig.P != lastP || ShooterConfig.I != lastI
+                || ShooterConfig.D != lastD || ShooterConfig.F != lastF) {
             applyPidCoefficients();
         }
 

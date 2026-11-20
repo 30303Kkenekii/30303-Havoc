@@ -1,7 +1,6 @@
-package org.firstinspires.ftc.teamcode.opmodes.Autos;
+package org.firstinspires.ftc.teamcode.opmodes;
 
 import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.pedropathing.api.Paths;
 import com.pedropathing.api.PoseFactory;
@@ -10,30 +9,18 @@ import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
-import org.firstinspires.ftc.teamcode.FieldConfig;
+import org.firstinspires.ftc.teamcode.opmodes.Alliance.Alliance;
+import org.firstinspires.ftc.teamcode.configurables.AutoConfig;
+import org.firstinspires.ftc.teamcode.configurables.FieldConfig;
 import org.firstinspires.ftc.teamcode.PoseStorage;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
-import org.firstinspires.ftc.teamcode.subsystems.TurretConfig;
+import org.firstinspires.ftc.teamcode.configurables.TurretConfig;
 import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
 
-@Config
 public abstract class BaseAuto extends LinearOpMode {
-    public enum Alliance { BLUE, RED }
     protected final Alliance alliance;
-
-    // --- TIMINGS (Dashboard Tunable) ---
-    public static double delayBeforeFire = 1;
-    public static double shootTime = 0.60;
-    public static double RPM_TOLERANCE = 20.0;
-    public static double MAX_SPINUP_WAIT = 2;
-
-    public static double intakeTimeout1 = 3.5;
-    public static double intakeTimeout2 = 3.5;
-    // --- RED ALLIANCE SPECIFIC TRIMS (Only applied if Alliance == RED) ---
-    public static double RED_ONLY_RPM_TRIM = 70; // <-- Put your -100 here!
-    public static double RED_ONLY_TURRET_TRIM = 0.0;
 
     protected Follower follower;
     protected ShooterSubsystem shooter;
@@ -41,7 +28,6 @@ public abstract class BaseAuto extends LinearOpMode {
     protected TurretSubsystem turret;
 
     private int pathState = 0;
-    private final ElapsedTime pathTimer = new ElapsedTime();
     private final ElapsedTime firingTimer = new ElapsedTime();
     private final ElapsedTime feedTimer = new ElapsedTime();
     private final ElapsedTime intakeTimer = new ElapsedTime();
@@ -121,6 +107,7 @@ public abstract class BaseAuto extends LinearOpMode {
         turret = new TurretSubsystem(hardwareMap);
 
         TurretConfig.ENABLED = true;
+        intake.setRaiseFlowerWhenFull(false); // Auto keeps the flower arm down
         shooter.spinUp();
 
         intake.flowerUp();
@@ -131,7 +118,7 @@ public abstract class BaseAuto extends LinearOpMode {
             telemetry.update();
         }
 
-        Constants.foresightConfig.maxPathSpeed.set(1.00); // 100% full speed
+        Constants.foresightConfig.maxPathSpeed.set(AutoConfig.MAX_PATH_SPEED);
         intake.flowerDown();
 
         setPathState(0);
@@ -161,14 +148,13 @@ public abstract class BaseAuto extends LinearOpMode {
         intake.stop();
     }
 
-    public void autonomousPathUpdate() {
+    private void autonomousPathUpdate() {
         switch (pathState) {
             case 0:
                 handleFiring(1, path1());
                 break;
 
             case 1:
-                intake.pivotDown();
                 intake.intake();
                 if (!follower.isBusy()) {
                     follower.follow(path2());
@@ -184,9 +170,8 @@ public abstract class BaseAuto extends LinearOpMode {
                 break;
 
             case 3:
-                if (intake.isConfirmedFull() || intakeTimer.seconds() > intakeTimeout1) {
+                if (intake.isConfirmedFull() || intakeTimer.seconds() > AutoConfig.INTAKE_TIMEOUT_1) {
                     intake.stop();
-                    intake.pivotUp();
                     follower.follow(path3());
                     setPathState(4);
                 }
@@ -203,7 +188,6 @@ public abstract class BaseAuto extends LinearOpMode {
                 break;
 
             case 6:
-                intake.pivotDown();
                 intake.intake();
                 if (!follower.isBusy()) {
                     follower.follow(path5());
@@ -219,10 +203,8 @@ public abstract class BaseAuto extends LinearOpMode {
                 break;
 
             case 8:
-                if (intake.isConfirmedFull() || intakeTimer.seconds() > intakeTimeout2) {
+                if (intake.isConfirmedFull() || intakeTimer.seconds() > AutoConfig.INTAKE_TIMEOUT_2) {
                     intake.stop();
-                    intake.pivotUp();
-                    intake.flowerUp();
                     follower.follow(path6());
                     setPathState(9);
                 }
@@ -269,9 +251,9 @@ public abstract class BaseAuto extends LinearOpMode {
 
         if (readyToFire) {
             double currentError = Math.abs(shooter.getTargetVelocity() - shooter.getCurrentVelocity());
-            boolean isAtSpeed = currentError <= RPM_TOLERANCE;
-            boolean settled = firingTimer.seconds() >= delayBeforeFire;
-            boolean timedOut = firingTimer.seconds() >= (delayBeforeFire + MAX_SPINUP_WAIT);
+            boolean isAtSpeed = currentError <= AutoConfig.RPM_TOLERANCE;
+            boolean settled = firingTimer.seconds() >= AutoConfig.DELAY_BEFORE_FIRE;
+            boolean timedOut = firingTimer.seconds() >= (AutoConfig.DELAY_BEFORE_FIRE + AutoConfig.MAX_SPINUP_WAIT);
 
             if (!isFeeding && (settled && isAtSpeed || timedOut)) {
                 isFeeding = true;
@@ -284,7 +266,7 @@ public abstract class BaseAuto extends LinearOpMode {
                 shooter.openGate();
                 intake.intakeShooting();
 
-                if (feedTimer.seconds() >= shootTime) {
+                if (feedTimer.seconds() >= AutoConfig.SHOOT_TIME) {
                     shooter.closeGate();
                     intake.stop();
                     readyToFire = false;
@@ -301,9 +283,8 @@ public abstract class BaseAuto extends LinearOpMode {
         }
     }
 
-    public void setPathState(int pState) {
+    private void setPathState(int pState) {
         pathState = pState;
-        pathTimer.reset();
     }
 
     private void updateAimAndFlywheel() {
@@ -312,16 +293,11 @@ public abstract class BaseAuto extends LinearOpMode {
         double ry = currentPose.y();
         double rh = Math.toDegrees(currentPose.heading());
 
-        // Define both goals for current alliance
-        double g1X, g1Y, g2X, g2Y;
-        if (alliance == Alliance.BLUE) {
-            g1X = FieldConfig.GOAL_1_X; g1Y = FieldConfig.GOAL_1_Y; // (83.75, 57.75)
-            g2X = FieldConfig.GOAL_2_X; g2Y = FieldConfig.GOAL_2_Y; // (83.75, 84.75)
-        } else {
-            // Mirrored Red goals: (60.25, 59.25) and (60.25, 86.25)
-            g1X = 144.0 - FieldConfig.GOAL_2_X; g1Y = 144.0 - FieldConfig.GOAL_2_Y;
-            g2X = 144.0 - FieldConfig.GOAL_1_X; g2Y = 144.0 - FieldConfig.GOAL_1_Y;
-        }
+        // Goal 1 = lower goal, Goal 2 = upper goal (mirrored automatically for Red)
+        double g1X = FieldConfig.goalX(alliance, false);
+        double g1Y = FieldConfig.goalY(alliance, false);
+        double g2X = FieldConfig.goalX(alliance, true);
+        double g2Y = FieldConfig.goalY(alliance, true);
 
         // Always aim at the NEAREST goal to where the robot is shooting
         double d1 = Math.hypot(g1X - rx, g1Y - ry);
@@ -332,33 +308,20 @@ public abstract class BaseAuto extends LinearOpMode {
         double gy = isGoal1Closer ? g1Y : g2Y;
         double dist = isGoal1Closer ? d1 : d2;
 
-        // Turret target angle
-        double fieldAngle = Math.toDegrees(Math.atan2(gy - ry, gx - rx));
-        double relativeAngle = fieldAngle - rh;
-        while (relativeAngle > 180.0) relativeAngle -= 360.0;
-        while (relativeAngle < -180.0) relativeAngle += 360.0;
+        // Each alliance + goal side has its own trims (see AutoConfig)
+        double turretTrim = AutoConfig.turretTrim(alliance, isGoal1Closer);
+        double rpmTrim = AutoConfig.rpmTrim(alliance, isGoal1Closer);
 
-        double activeTurretTrim = isGoal1Closer ? FieldConfig.AUTO_GOAL1_TURRET_TRIM : FieldConfig.AUTO_GOAL2_TURRET_TRIM;
-        turret.setTargetAngle(-relativeAngle + activeTurretTrim);
-
-        double baseTps = ShooterSubsystem.calculateVelocityFromDistance(dist);
-        double activeTpsTrim = isGoal1Closer ? FieldConfig.AUTO_GOAL1_RPM_TRIM : FieldConfig.AUTO_GOAL2_RPM_TRIM;
-
-// 2. ONLY apply RED_ONLY_RPM_TRIM if running on Red Alliance!
-        double redRpmOffset = (alliance == Alliance.RED) ? RED_ONLY_RPM_TRIM : 0.0;
-        double redTurretOffset = (alliance == Alliance.RED) ? RED_ONLY_TURRET_TRIM : 0.0;
-
-// Apply: Blue stays 100% untouched, Red gets the -100!
-        turret.setTargetAngle(-relativeAngle + activeTurretTrim + redTurretOffset);
-        shooter.setTargetVelocity(baseTps + activeTpsTrim + redRpmOffset);
+        turret.aimAt(rx, ry, rh, gx, gy, turretTrim);
+        shooter.setTargetVelocity(ShooterSubsystem.calculateVelocityFromDistance(dist) + rpmTrim);
     }
 
-    public Path path1() { return Paths.line(start, path1).linear(start, path1); }
-    public Path path2() { return Paths.line(path1, point2).tangent(); }
-    public Path path3() { return Paths.curve(point2, point3Control1, point3Control2, point3Control3, point3).reverseTangent(); }
-    public Path path4() { return Paths.curve(point4Start, point4Control1, point4).linear(point4Start, point4); }
-    public Path path5() { return Paths.line(point4, point5).constant(point5); }
-    public Path path6() { return Paths.curve(point5, point6Control1, point6Control2, point6).reverseTangent(); }
-    public Path path7() { return Paths.curve(point7Start, point7Control1, point7Control2, point7Control3, point7Control4, point7).linear(point7Start, point7); }
-    public Path path8() { return Paths.line(point7, point8).reverseTangent(); }
+    private Path path1() { return Paths.line(start, path1).linear(start, path1); }
+    private Path path2() { return Paths.line(path1, point2).tangent(); }
+    private Path path3() { return Paths.curve(point2, point3Control1, point3Control2, point3Control3, point3).reverseTangent(); }
+    private Path path4() { return Paths.curve(point4Start, point4Control1, point4).linear(point4Start, point4); }
+    private Path path5() { return Paths.line(point4, point5).constant(point5); }
+    private Path path6() { return Paths.curve(point5, point6Control1, point6Control2, point6).reverseTangent(); }
+    private Path path7() { return Paths.curve(point7Start, point7Control1, point7Control2, point7Control3, point7Control4, point7).linear(point7Start, point7); }
+    private Path path8() { return Paths.line(point7, point8).reverseTangent(); }
 }

@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.subsystems;
+package org.firstinspires.ftc.teamcode.configurables;
 
 import com.acmerobotics.dashboard.config.Config;
 
@@ -33,4 +33,15 @@ public class TurretConfig {
     // --- Driver Controls ---
     public static double TRIM_STEP_DEG = 1.0;
     public static double TOLERANCE_DEG = 2.0;
+
+    // ==========================================
+    // SHOOT-ON-THE-MOVE (turret lead only) -- all values are PLACEHOLDERS, tune on the robot
+    // lead time = SOTM_LAUNCH_DELAY_SEC + SOTM_TOF_OFFSET_SEC + SOTM_TOF_SEC_PER_INCH * distance
+    // ==========================================
+    public static boolean SOTM_ENABLED_AT_START = false; // Driver toggles in TeleOp (Left Stick Click)
+    public static double SOTM_TOF_OFFSET_SEC = 0.0;      // Fixed part of ball flight time
+    public static double SOTM_TOF_SEC_PER_INCH = 0.005;  // Flight time per inch of goal distance
+    public static double SOTM_LAUNCH_DELAY_SEC = 0.0;    // "Decide to shoot" -> ball actually leaves
+    public static double SOTM_MIN_SPEED_IN_PER_SEC = 3.0; // Ignore slower speeds (localizer noise)
+    public static double SOTM_MAX_LEAD_IN = 36.0;        // Cap on how far the aim point may shift
 }
